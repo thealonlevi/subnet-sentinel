@@ -1,12 +1,11 @@
 # subnet-sentinel
 
-`subnet-sentinel` is a daemon and CLI that probes outbound connectivity using random source IPs carved from configured IPv4 subnets. It helps operators verify that routed subnets remain usable and mounted correctly on the host.
+`subnet-sentinel` is a daemon and CLI that probes outbound connectivity using random source IPs carved from configured IPv4 subnets. It helps operators verify that routed subnets remain usable on the host.
 
 ## Features
 - Periodic or one-shot connectivity checks against configurable HTTP targets
 - Source-IP binding per request with per-target latency and status reporting
-- Optional auto-mounting of subnets: interface IP assignment, loopback routes, and `ip_nonlocal_bind`
-- CLI for running checks, ensuring mounts, and inspecting mount status
+- CLI for running checks and inspecting stubbed mount status output
 - Systemd service unit for unattended operation
 
 ## Requirements
@@ -29,9 +28,9 @@ subnets:
       - 154.208.64.1
       - 154.208.64.2
       - 154.208.64.3
-    mountInterface: eno1
+    mountInterface: lo
   - cidr: 154.208.112.0/21
-    mountInterface: eno1
+    mountInterface: lo
 
 targets:
   - https://google.com
@@ -40,8 +39,8 @@ targets:
 
 ipsPerSubnet: 5
 intervalSeconds: 60
-autoMountSubnets: true
-defaultInterface: eno1
+autoMountSubnets: false
+defaultInterface: lo
 ```
 
 Key fields:
@@ -49,8 +48,8 @@ Key fields:
 - `targets`: HTTP endpoints to probe (defaults to public connectivity targets)
 - `ipsPerSubnet`: number of unique hosts sampled per subnet per run (default 5)
 - `intervalSeconds`: delay between runs in daemon mode (default 60)
-- `autoMountSubnets`: enable auto-mounting before checks (`false` by default)
-- `defaultInterface`: interface used for mounting when a subnet override is absent
+- `autoMountSubnets`: unused placeholder in this version (always disabled)
+- `defaultInterface`: used for future mount functionality (suggest `lo`)
 
 ## CLI Usage
 ```bash
@@ -71,6 +70,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable subnet-sentinel
 sudo systemctl start subnet-sentinel
 ```
+
+## Operational Notes
+- Current version does not modify system networking. Ensure required addresses, local routes, and `ip_nonlocal_bind=1` are configured manually (for example via `ip route add local ... dev lo`) before running the daemon.
+- Future releases will reintroduce optional mounting helpers once they can run safely.
 
 ## Testing
 ```bash

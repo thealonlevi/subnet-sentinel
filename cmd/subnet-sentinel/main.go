@@ -65,33 +65,27 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	requests := mount.PrepareRequests(cfg.DefaultInterface, subnetDefs)
 	switch command {
 	case "run":
-		return executeRunLoop(ctx, cfg, subnetDefs, requests, logger)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger)
 	case "once":
-		return executeOnce(ctx, cfg, subnetDefs, requests, logger)
+		return executeOnce(ctx, cfg, subnetDefs, logger)
 	case "check-mount":
-		return executeCheckMount(ctx, requests)
+		return executeCheckMount(ctx, cfg.DefaultInterface, subnetDefs)
 	case "mount":
-		return executeMount(ctx, requests)
+		return executeMount()
 	case "":
-		return executeRunLoop(ctx, cfg, subnetDefs, requests, logger)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger)
 	default:
 		return fmt.Errorf("unknown command %s", command)
 	}
 }
 
-func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, requests []mount.Request, logger logging.Logger) error {
+func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger) error {
 	client := httpclient.New(15 * time.Second)
 	chk, err := checker.New(cfg, subs, client, logger)
 	if err != nil {
 		return err
-	}
-	if cfg.AutoMountSubnets {
-		if _, err := mount.EnsureMounted(ctx, requests); err != nil {
-			logger.Error("auto mount failed: %v", err)
-		}
 	}
 	interval := time.Duration(cfg.IntervalSeconds) * time.Second
 	if interval < 0 {
@@ -121,16 +115,11 @@ func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subne
 	}
 }
 
-func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, requests []mount.Request, logger logging.Logger) error {
+func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger) error {
 	client := httpclient.New(15 * time.Second)
 	chk, err := checker.New(cfg, subs, client, logger)
 	if err != nil {
 		return err
-	}
-	if cfg.AutoMountSubnets {
-		if _, err := mount.EnsureMounted(ctx, requests); err != nil {
-			logger.Error("auto mount failed: %v", err)
-		}
 	}
 	results, err := chk.Run(ctx)
 	if err != nil {
@@ -140,7 +129,8 @@ func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, 
 	return nil
 }
 
-func executeCheckMount(ctx context.Context, requests []mount.Request) error {
+func executeCheckMount(ctx context.Context, defaultInterface string, subs []subnets.Subnet) error {
+	requests := mount.PrepareRequests(defaultInterface, subs)
 	statuses, err := mount.Check(ctx, requests)
 	if err != nil {
 		return err
@@ -149,12 +139,8 @@ func executeCheckMount(ctx context.Context, requests []mount.Request) error {
 	return nil
 }
 
-func executeMount(ctx context.Context, requests []mount.Request) error {
-	statuses, err := mount.EnsureMounted(ctx, requests)
-	if err != nil {
-		return err
-	}
-	printMountStatuses("MOUNT", statuses)
+func executeMount() error {
+	fmt.Println("Mount functionality is disabled in this version.")
 	return nil
 }
 
