@@ -1,0 +1,15 @@
+[Unit]
+Description=Subnet Sentinel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/subnet-sentinel run --config /etc/subnet-sentinel/config.yaml
+Restart=always
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target
+

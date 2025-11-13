@@ -1,0 +1,21 @@
+subnets:
+  - cidr: 154.208.64.0/21
+    excludeHosts:
+      - 154.208.64.0
+      - 154.208.64.1
+      - 154.208.64.2
+      - 154.208.64.3
+    mountInterface: eno1
+  - cidr: 154.208.112.0/21
+    mountInterface: eno1
+
+targets:
+  - https://google.com
+  - https://ipinfo.io
+  - https://icanhazip.com
+
+ipsPerSubnet: 5
+intervalSeconds: 60
+autoMountSubnets: true
+defaultInterface: eno1
+
