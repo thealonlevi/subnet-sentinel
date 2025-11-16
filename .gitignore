@@ -4,4 +4,4 @@ dist/
 *.exe
 *.test
 *.out
-
+scraper.py

@@ -102,9 +102,13 @@ func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subne
 	if err != nil {
 		return err
 	}
-	interval := time.Duration(cfg.IntervalSeconds) * time.Second
-	if interval < 0 {
-		interval = 0
+	rawInterval := cfg.IntervalSeconds
+	var interval time.Duration
+	if rawInterval == 0 {
+		logger.Info("intervalSeconds is 0; using 1s interval to avoid busy-loop")
+		interval = time.Second
+	} else {
+		interval = time.Duration(rawInterval) * time.Second
 	}
 	runID := 1
 	for {
@@ -115,9 +119,6 @@ func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subne
 		}
 		printSummary(runID, results)
 		runID++
-		if interval == 0 {
-			continue
-		}
 		elapsed := time.Since(start)
 		sleep := interval - elapsed
 		if sleep > 0 {

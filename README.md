@@ -48,7 +48,7 @@ Key fields:
 - `subnets`: CIDRs to monitor, with optional host exclusions and interface overrides
 - `targets`: HTTP endpoints to probe (defaults to public connectivity targets)
 - `ipsPerSubnet`: number of unique hosts sampled per subnet per run (default 5)
-- `intervalSeconds`: delay between runs in daemon mode (default 60)
+- `intervalSeconds`: delay between runs in daemon mode (default 60). If set to `0`, `subnet-sentinel` runs continuously with a minimum 1-second delay between runs to avoid busy-looping
 - `autoMountSubnets`: when true, the first HTTP failure in a run triggers subnet mounting and a single retry of that request
 - `defaultInterface`: interface used when a subnet does not specify `mountInterface`
 
@@ -75,6 +75,21 @@ sudo systemctl start subnet-sentinel
 ## Operational Notes
 - With `autoMountSubnets` disabled, configure addresses, local routes (`ip route add local ... dev lo`), and `ip_nonlocal_bind=1` manually before running the daemon.
 - With `autoMountSubnets` enabled, the first HTTP failure in a run will assign deterministic host IPs, ensure loopback routes, set `ip_nonlocal_bind=1`, and retry the failed request once.
+
+### Container vs bare-metal
+
+- On bare metal (systemd unit):
+  - The sample unit runs as `User=root` because mounting features require:
+    - `ip addr` / `ip route` commands
+    - write access to `/proc/sys/net/ipv4/ip_nonlocal_bind`
+  - This is the recommended setup when using `autoMountSubnets: true`.
+
+- In Docker:
+  - The provided `Dockerfile` creates a non-root user (`appuser`) and runs the binary as that user by default.
+  - In this default container configuration, subnet mounting (`autoMountSubnets`, `mount` and `check-mount` that modify system state) will fail unless the container is started with:
+    - root or a user with sufficient privileges, and
+    - appropriate capabilities (e.g. `--cap-add=NET_ADMIN` and write access to `/proc/sys/net/ipv4/ip_nonlocal_bind`).
+  - For a "check-only" setup inside Docker (no mounting), disable `autoMountSubnets` and preconfigure IPs/routes on the host or via your orchestrator.
 
 ## Testing
 ```bash
