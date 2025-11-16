@@ -81,7 +81,7 @@ func (r *Runner) runOne(parentCtx context.Context, path string, e FailureEvent) 
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, "/bin/sh", path)
+	cmd := exec.CommandContext(ctx, "/usr/bin/env", "bash", path)
 	cmd.Env = append(os.Environ(),
 		"SUBNET_CIDR="+e.SubnetCIDR,
 		"IP="+e.IP.String(),
