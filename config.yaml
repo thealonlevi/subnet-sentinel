@@ -8,8 +8,6 @@ subnets:
     mountInterface: eno1
   - cidr: 154.208.112.0/21
     mountInterface: eno1
-  - cidr: 154.210.64.0/21
-    mountInterface: eno1
 
 targets:
   - https://google.com
