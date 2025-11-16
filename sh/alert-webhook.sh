@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-URL="${FLASH_ALERT_WEBHOOK_URL:?FLASH_ALERT_WEBHOOK_URL env var is required}"
+URL="${FLASH_ALERT_WEBHOOK_URL:-}"
+SECRET="${EVENTS_HMAC_SECRET:-}"
 SERVICE="${SERVICE:-api}"
-EVENTS_HMAC_SECRET="${EVENTS_HMAC_SECRET:?EVENTS_HMAC_SECRET env var is required}"
+
+if [ -z "$URL" ] || [ -z "$SECRET" ]; then
+  exit 0
+fi
 
 ts_ms="$(date +%s%3N)"
 idempotency_key="$(uuidgen 2>/dev/null || echo "${ts_ms}-$$")"
@@ -23,7 +27,7 @@ body=$(printf '{"severity":"HIGH","topic":"subnet-sentinel.failure","alert_key":
   "$subnet" "$ip" "$subnet" "$target" "$host" "$subnet" "$target" "$err" "$ts_event" "$ts_iso_now" "$idempotency_key")
 
 msg="${ts_ms}.${body}"
-sig=$(printf '%s' "$msg" | openssl dgst -binary -sha256 -hmac "$EVENTS_HMAC_SECRET" | base64)
+sig=$(printf '%s' "$msg" | openssl dgst -binary -sha256 -hmac "$SECRET" | base64)
 
 curl -sS -X POST "$URL" \
   -H "content-type: application/json" \
