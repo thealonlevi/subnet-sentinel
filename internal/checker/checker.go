@@ -17,10 +17,11 @@ type HTTPClient interface {
 }
 
 type Checker struct {
-	Config  config.Config
-	Subnets []subnets.Subnet
-	Client  HTTPClient
-	Logger  logging.Logger
+	Config       config.Config
+	Subnets      []subnets.Subnet
+	Client       HTTPClient
+	Logger       logging.Logger
+	MountOnError func(context.Context) error
 }
 
 type Result struct {
@@ -33,20 +34,22 @@ type Result struct {
 	Error      string
 }
 
-func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger logging.Logger) (*Checker, error) {
+func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger logging.Logger, mountOnError func(context.Context) error) (*Checker, error) {
 	if client == nil {
 		return nil, fmt.Errorf("http client is required")
 	}
 	return &Checker{
-		Config:  cfg,
-		Subnets: subs,
-		Client:  client,
-		Logger:  logger,
+		Config:       cfg,
+		Subnets:      subs,
+		Client:       client,
+		Logger:       logger,
+		MountOnError: mountOnError,
 	}, nil
 }
 
 func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 	results := make([]Result, 0)
+	mountAttempted := false
 	for _, subnet := range c.Subnets {
 		select {
 		case <-ctx.Done():
@@ -65,11 +68,40 @@ func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 				default:
 				}
 				res, err := c.performRequest(ctx, subnet.CIDR, host, target)
+				initialErr := err
+				retried := false
+				if err != nil && c.MountOnError != nil {
+					if !mountAttempted {
+						mountAttempted = true
+						if mountErr := c.MountOnError(ctx); mountErr != nil {
+							c.Logger.Error("mount attempt failed: %v", mountErr)
+						} else {
+							c.Logger.Info("mount attempt completed")
+						}
+					}
+					select {
+					case <-ctx.Done():
+						return results, ctx.Err()
+					default:
+					}
+					retried = true
+					resRetry, retryErr := c.performRequest(ctx, subnet.CIDR, host, target)
+					res = resRetry
+					err = retryErr
+				}
 				results = append(results, res)
 				if err != nil {
-					c.Logger.Error("request failed subnet=%s ip=%s url=%s error=%s", subnet.CIDR, host.String(), target, err.Error())
+					if retried {
+						c.Logger.Error("request failed after retry subnet=%s ip=%s url=%s initial_error=%s error=%s", subnet.CIDR, host.String(), target, errorString(initialErr), err.Error())
+					} else {
+						c.Logger.Error("request failed subnet=%s ip=%s url=%s error=%s", subnet.CIDR, host.String(), target, err.Error())
+					}
 				} else {
-					c.Logger.Debug("request succeeded subnet=%s ip=%s url=%s status=%d", subnet.CIDR, host.String(), target, res.StatusCode)
+					if retried || initialErr != nil {
+						c.Logger.Info("request succeeded after retry subnet=%s ip=%s url=%s status=%d initial_error=%s", subnet.CIDR, host.String(), target, res.StatusCode, errorString(initialErr))
+					} else {
+						c.Logger.Debug("request succeeded subnet=%s ip=%s url=%s status=%d", subnet.CIDR, host.String(), target, res.StatusCode)
+					}
 				}
 			}
 		}
@@ -96,4 +128,11 @@ func (c *Checker) performRequest(ctx context.Context, subnet string, ip net.IP, 
 		result.Error = err.Error()
 	}
 	return result, err
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

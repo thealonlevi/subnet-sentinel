@@ -5,7 +5,8 @@
 ## Features
 - Periodic or one-shot connectivity checks against configurable HTTP targets
 - Source-IP binding per request with per-target latency and status reporting
-- CLI for running checks and inspecting stubbed mount status output
+- Optional auto-mount retry: on the first HTTP failure (when enabled) the tool mounts subnets and retries once
+- CLI for running checks and inspecting mount status
 - Systemd service unit for unattended operation
 
 ## Requirements
@@ -28,9 +29,9 @@ subnets:
       - 154.208.64.1
       - 154.208.64.2
       - 154.208.64.3
-    mountInterface: lo
+    mountInterface: eno1
   - cidr: 154.208.112.0/21
-    mountInterface: lo
+    mountInterface: eno1
 
 targets:
   - https://google.com
@@ -40,7 +41,7 @@ targets:
 ipsPerSubnet: 5
 intervalSeconds: 60
 autoMountSubnets: false
-defaultInterface: lo
+defaultInterface: eno1
 ```
 
 Key fields:
@@ -48,8 +49,8 @@ Key fields:
 - `targets`: HTTP endpoints to probe (defaults to public connectivity targets)
 - `ipsPerSubnet`: number of unique hosts sampled per subnet per run (default 5)
 - `intervalSeconds`: delay between runs in daemon mode (default 60)
-- `autoMountSubnets`: unused placeholder in this version (always disabled)
-- `defaultInterface`: used for future mount functionality (suggest `lo`)
+- `autoMountSubnets`: when true, the first HTTP failure in a run triggers subnet mounting and a single retry of that request
+- `defaultInterface`: interface used when a subnet does not specify `mountInterface`
 
 ## CLI Usage
 ```bash
@@ -72,8 +73,8 @@ sudo systemctl start subnet-sentinel
 ```
 
 ## Operational Notes
-- Current version does not modify system networking. Ensure required addresses, local routes, and `ip_nonlocal_bind=1` are configured manually (for example via `ip route add local ... dev lo`) before running the daemon.
-- Future releases will reintroduce optional mounting helpers once they can run safely.
+- With `autoMountSubnets` disabled, configure addresses, local routes (`ip route add local ... dev lo`), and `ip_nonlocal_bind=1` manually before running the daemon.
+- With `autoMountSubnets` enabled, the first HTTP failure in a run will assign deterministic host IPs, ensure loopback routes, set `ip_nonlocal_bind=1`, and retry the failed request once.
 
 ## Testing
 ```bash

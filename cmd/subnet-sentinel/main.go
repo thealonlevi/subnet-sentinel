@@ -65,25 +65,40 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	requests := mount.PrepareRequests(cfg.DefaultInterface, subnetDefs)
+	var mountFn func(context.Context) error
+	if cfg.AutoMountSubnets {
+		mountFn = func(runCtx context.Context) error {
+			logger.Info("auto mount triggered")
+			statuses, err := mount.EnsureMounted(runCtx, requests)
+			for _, status := range statuses {
+				logger.Info("mount status subnet=%s interface=%s ip_assigned=%t route=%t nonlocal=%t", status.CIDR, status.Interface, status.IPAssigned, status.RouteExists, status.NonLocalBind)
+				if len(status.Errors) > 0 {
+					logger.Error("mount errors subnet=%s errors=%s", status.CIDR, strings.Join(status.Errors, "; "))
+				}
+			}
+			return err
+		}
+	}
 	switch command {
 	case "run":
-		return executeRunLoop(ctx, cfg, subnetDefs, logger)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn)
 	case "once":
-		return executeOnce(ctx, cfg, subnetDefs, logger)
+		return executeOnce(ctx, cfg, subnetDefs, logger, mountFn)
 	case "check-mount":
-		return executeCheckMount(ctx, cfg.DefaultInterface, subnetDefs)
+		return executeCheckMount(ctx, requests)
 	case "mount":
-		return executeMount()
+		return executeMount(ctx, requests)
 	case "":
-		return executeRunLoop(ctx, cfg, subnetDefs, logger)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn)
 	default:
 		return fmt.Errorf("unknown command %s", command)
 	}
 }
 
-func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger) error {
+func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error) error {
 	client := httpclient.New(15 * time.Second)
-	chk, err := checker.New(cfg, subs, client, logger)
+	chk, err := checker.New(cfg, subs, client, logger, mountFn)
 	if err != nil {
 		return err
 	}
@@ -115,9 +130,9 @@ func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subne
 	}
 }
 
-func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger) error {
+func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error) error {
 	client := httpclient.New(15 * time.Second)
-	chk, err := checker.New(cfg, subs, client, logger)
+	chk, err := checker.New(cfg, subs, client, logger, mountFn)
 	if err != nil {
 		return err
 	}
@@ -129,8 +144,7 @@ func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, 
 	return nil
 }
 
-func executeCheckMount(ctx context.Context, defaultInterface string, subs []subnets.Subnet) error {
-	requests := mount.PrepareRequests(defaultInterface, subs)
+func executeCheckMount(ctx context.Context, requests []mount.Request) error {
 	statuses, err := mount.Check(ctx, requests)
 	if err != nil {
 		return err
@@ -139,8 +153,12 @@ func executeCheckMount(ctx context.Context, defaultInterface string, subs []subn
 	return nil
 }
 
-func executeMount() error {
-	fmt.Println("Mount functionality is disabled in this version.")
+func executeMount(ctx context.Context, requests []mount.Request) error {
+	statuses, err := mount.EnsureMounted(ctx, requests)
+	if err != nil {
+		return err
+	}
+	printMountStatuses("MOUNT", statuses)
 	return nil
 }
 

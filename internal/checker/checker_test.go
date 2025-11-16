@@ -60,7 +60,7 @@ func TestCheckerRunCollectsResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
-	chk, err := New(cfg, subs, mock, logger)
+	chk, err := New(cfg, subs, mock, logger, nil)
 	if err != nil {
 		t.Fatalf("checker init: %v", err)
 	}
@@ -109,5 +109,64 @@ func TestCheckerRunCollectsResults(t *testing.T) {
 	}
 	if mock.calls[0].IP.String() != mock.calls[1].IP.String() {
 		t.Fatalf("expected same host ip for both calls")
+	}
+}
+
+func TestCheckerRetriesAfterMount(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "10.1.0.0/30"},
+		},
+		Targets:      []string{"https://retry.test"},
+		IPsPerSubnet: 1,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{
+			{result: httpclient.Result{StatusCode: 503, Duration: 20 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
+			{result: httpclient.Result{StatusCode: 200, Duration: 40 * time.Millisecond}},
+		},
+	}
+	logger, err := logging.New("error")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	mountCalled := false
+	mountFn := func(ctx context.Context) error {
+		mountCalled = true
+		return nil
+	}
+	chk, err := New(cfg, subs, mock, logger, mountFn)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	res := results[0]
+	if !res.Success {
+		t.Fatalf("expected success after retry")
+	}
+	if res.StatusCode != 200 {
+		t.Fatalf("expected status 200, got %d", res.StatusCode)
+	}
+	if res.Error != "" {
+		t.Fatalf("expected empty error, got %s", res.Error)
+	}
+	if !mountCalled {
+		t.Fatalf("expected mount function to be called")
+	}
+	if len(mock.calls) != 2 {
+		t.Fatalf("expected 2 client calls, got %d", len(mock.calls))
+	}
+	if mock.calls[0].IP.String() != mock.calls[1].IP.String() {
+		t.Fatalf("expected same host ip across retries")
 	}
 }
