@@ -5,3 +5,4 @@ dist/
 *.test
 *.out
 scraper.py
+files.log

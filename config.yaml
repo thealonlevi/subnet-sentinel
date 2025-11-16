@@ -5,9 +5,9 @@ subnets:
       - 154.208.64.1
       - 154.208.64.2
       - 154.208.64.3
-    mountInterface: lo
+    mountInterface: eno1
   - cidr: 154.208.112.0/21
-    mountInterface: lo
+    mountInterface: eno1
 
 targets:
   - https://google.com
@@ -17,4 +17,4 @@ targets:
 ipsPerSubnet: 5
 intervalSeconds: 60
 autoMountSubnets: false
-defaultInterface: lo
+defaultInterface: eno1
