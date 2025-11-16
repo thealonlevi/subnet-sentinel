@@ -16,5 +16,7 @@ targets:
 
 ipsPerSubnet: 5
 intervalSeconds: 60
-autoMountSubnets: false
+autoMountSubnets: true
 defaultInterface: eno1
+runFailureScripts: true
+failureScriptsDir: "~/subnet-sentinel/sh"

@@ -60,7 +60,7 @@ func TestCheckerRunCollectsResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
-	chk, err := New(cfg, subs, mock, logger, nil)
+	chk, err := New(cfg, subs, mock, logger, nil, nil)
 	if err != nil {
 		t.Fatalf("checker init: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestCheckerRetriesAfterMount(t *testing.T) {
 		mountCalled = true
 		return nil
 	}
-	chk, err := New(cfg, subs, mock, logger, mountFn)
+	chk, err := New(cfg, subs, mock, logger, mountFn, nil)
 	if err != nil {
 		t.Fatalf("checker init: %v", err)
 	}

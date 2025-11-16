@@ -6,3 +6,4 @@ dist/
 *.out
 scraper.py
 files.log
+.env

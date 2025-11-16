@@ -16,12 +16,23 @@ type HTTPClient interface {
 	Do(ctx context.Context, source net.IP, url string) (httpclient.Result, error)
 }
 
+type FailureEvent struct {
+	SubnetCIDR string
+	IP         net.IP
+	Target     string
+	Error      error
+	Timestamp  time.Time
+}
+
+type OnFailureFunc func(ctx context.Context, e FailureEvent)
+
 type Checker struct {
 	Config       config.Config
 	Subnets      []subnets.Subnet
 	Client       HTTPClient
 	Logger       logging.Logger
 	MountOnError func(context.Context) error
+	OnFailure    OnFailureFunc
 }
 
 type Result struct {
@@ -34,7 +45,7 @@ type Result struct {
 	Error      string
 }
 
-func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger logging.Logger, mountOnError func(context.Context) error) (*Checker, error) {
+func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger logging.Logger, mountOnError func(context.Context) error, onFailure OnFailureFunc) (*Checker, error) {
 	if client == nil {
 		return nil, fmt.Errorf("http client is required")
 	}
@@ -44,6 +55,7 @@ func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger log
 		Client:       client,
 		Logger:       logger,
 		MountOnError: mountOnError,
+		OnFailure:    onFailure,
 	}, nil
 }
 
@@ -95,6 +107,15 @@ func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 						c.Logger.Error("request failed after retry subnet=%s ip=%s url=%s initial_error=%s error=%s", subnet.CIDR, host.String(), target, errorString(initialErr), err.Error())
 					} else {
 						c.Logger.Error("request failed subnet=%s ip=%s url=%s error=%s", subnet.CIDR, host.String(), target, err.Error())
+					}
+					if c.OnFailure != nil {
+						c.OnFailure(ctx, FailureEvent{
+							SubnetCIDR: subnet.CIDR,
+							IP:         host,
+							Target:     target,
+							Error:      err,
+							Timestamp:  time.Now(),
+						})
 					}
 				} else {
 					if retried || initialErr != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/thealonlevi/subnet-sentinel/internal/httpclient"
 	"github.com/thealonlevi/subnet-sentinel/internal/logging"
 	"github.com/thealonlevi/subnet-sentinel/internal/mount"
+	"github.com/thealonlevi/subnet-sentinel/internal/scripts"
 	"github.com/thealonlevi/subnet-sentinel/internal/subnets"
 )
 
@@ -80,25 +81,42 @@ func run() error {
 			return err
 		}
 	}
+	var onFailure checker.OnFailureFunc
+	if cfg.RunFailureScripts {
+		scriptRunner, err := scripts.NewRunner(cfg.FailureScriptsDir, logger, 10*time.Second)
+		if err != nil {
+			logger.Warn("failed to initialize failure scripts", "err", err)
+		} else {
+			onFailure = func(ctx context.Context, e checker.FailureEvent) {
+				scriptRunner.OnFailure(ctx, scripts.FailureEvent{
+					SubnetCIDR: e.SubnetCIDR,
+					IP:         e.IP,
+					Target:     e.Target,
+					Error:      e.Error,
+					Timestamp:  e.Timestamp,
+				})
+			}
+		}
+	}
 	switch command {
 	case "run":
-		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn, onFailure)
 	case "once":
-		return executeOnce(ctx, cfg, subnetDefs, logger, mountFn)
+		return executeOnce(ctx, cfg, subnetDefs, logger, mountFn, onFailure)
 	case "check-mount":
 		return executeCheckMount(ctx, requests)
 	case "mount":
 		return executeMount(ctx, requests)
 	case "":
-		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn)
+		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn, onFailure)
 	default:
 		return fmt.Errorf("unknown command %s", command)
 	}
 }
 
-func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error) error {
+func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error, onFailure checker.OnFailureFunc) error {
 	client := httpclient.New(15 * time.Second)
-	chk, err := checker.New(cfg, subs, client, logger, mountFn)
+	chk, err := checker.New(cfg, subs, client, logger, mountFn, onFailure)
 	if err != nil {
 		return err
 	}
@@ -131,9 +149,9 @@ func executeRunLoop(ctx context.Context, cfg config.Config, subs []subnets.Subne
 	}
 }
 
-func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error) error {
+func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, logger logging.Logger, mountFn func(context.Context) error, onFailure checker.OnFailureFunc) error {
 	client := httpclient.New(15 * time.Second)
-	chk, err := checker.New(cfg, subs, client, logger, mountFn)
+	chk, err := checker.New(cfg, subs, client, logger, mountFn, onFailure)
 	if err != nil {
 		return err
 	}

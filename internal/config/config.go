@@ -16,12 +16,14 @@ type SubnetConfig struct {
 }
 
 type Config struct {
-	Subnets          []SubnetConfig `yaml:"subnets"`
-	Targets          []string       `yaml:"targets"`
-	IPsPerSubnet     int            `yaml:"ipsPerSubnet"`
-	IntervalSeconds  int            `yaml:"intervalSeconds"`
-	AutoMountSubnets bool           `yaml:"autoMountSubnets"`
-	DefaultInterface string         `yaml:"defaultInterface"`
+	Subnets           []SubnetConfig `yaml:"subnets"`
+	Targets           []string       `yaml:"targets"`
+	IPsPerSubnet      int            `yaml:"ipsPerSubnet"`
+	IntervalSeconds   int            `yaml:"intervalSeconds"`
+	AutoMountSubnets  bool           `yaml:"autoMountSubnets"`
+	DefaultInterface  string         `yaml:"defaultInterface"`
+	RunFailureScripts bool           `yaml:"runFailureScripts"`
+	FailureScriptsDir string         `yaml:"failureScriptsDir"`
 }
 
 var defaultTargets = []string{
@@ -55,6 +57,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.IntervalSeconds == 0 {
 		c.IntervalSeconds = 60
+	}
+	if c.FailureScriptsDir == "" {
+		c.FailureScriptsDir = "./sh"
 	}
 }
 

@@ -42,6 +42,8 @@ ipsPerSubnet: 5
 intervalSeconds: 60
 autoMountSubnets: false
 defaultInterface: eno1
+runFailureScripts: false
+failureScriptsDir: "./sh"
 ```
 
 Key fields:
@@ -51,6 +53,8 @@ Key fields:
 - `intervalSeconds`: delay between runs in daemon mode (default 60). If set to `0`, `subnet-sentinel` runs continuously with a minimum 1-second delay between runs to avoid busy-looping
 - `autoMountSubnets`: when true, the first HTTP failure in a run triggers subnet mounting and a single retry of that request
 - `defaultInterface`: interface used when a subnet does not specify `mountInterface`
+- `runFailureScripts`: when true, executes all `.sh` scripts in `failureScriptsDir` on each probe failure (default false)
+- `failureScriptsDir`: directory containing failure scripts (default `./sh`)
 
 ## CLI Usage
 ```bash
@@ -75,6 +79,28 @@ sudo systemctl start subnet-sentinel
 ## Operational Notes
 - With `autoMountSubnets` disabled, configure addresses, local routes (`ip route add local ... dev lo`), and `ip_nonlocal_bind=1` manually before running the daemon.
 - With `autoMountSubnets` enabled, the first HTTP failure in a run will assign deterministic host IPs, ensure loopback routes, set `ip_nonlocal_bind=1`, and retry the failed request once.
+
+### Failure Scripts
+
+When `runFailureScripts: true`, `subnet-sentinel` will execute all `.sh` scripts in the configured `failureScriptsDir` (default `./sh`) whenever a probe fails. Scripts are discovered at startup and executed sequentially for each failure.
+
+Each script receives the following environment variables:
+- `SUBNET_CIDR`: the subnet CIDR that failed
+- `IP`: the source IP that was used
+- `TARGET`: the target URL that was probed
+- `ERROR`: the error message
+- `TIMESTAMP`: RFC3339 timestamp of the failure
+
+Example script `sh/alert.sh`:
+```bash
+#!/usr/bin/env bash
+echo "Subnet failure on $SUBNET_CIDR ip=$IP target=$TARGET error=$ERROR at $TIMESTAMP" >> /var/log/subnet-sentinel-failures.log
+```
+
+Make scripts executable:
+```bash
+chmod +x sh/alert.sh
+```
 
 ### Container vs bare-metal
 

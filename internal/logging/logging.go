@@ -64,3 +64,10 @@ func (l Logger) Error(message string, args ...interface{}) {
 	}
 	l.base.Printf("ERROR "+message, args...)
 }
+
+func (l Logger) Warn(message string, args ...interface{}) {
+	if l.level > LevelInfo {
+		return
+	}
+	l.base.Printf("WARN "+message, args...)
+}
