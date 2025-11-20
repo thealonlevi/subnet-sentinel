@@ -44,6 +44,7 @@ autoMountSubnets: false
 defaultInterface: eno1
 runFailureScripts: false
 failureScriptsDir: "./sh"
+alertOnPartialTargetFailure: false
 ```
 
 Key fields:
@@ -55,6 +56,7 @@ Key fields:
 - `defaultInterface`: interface used when a subnet does not specify `mountInterface`
 - `runFailureScripts`: when true, executes all `.sh` scripts in `failureScriptsDir` on each probe failure (default false)
 - `failureScriptsDir`: directory containing failure scripts (default `./sh`)
+- `alertOnPartialTargetFailure`: when `true`, failure scripts run on every failed probe, even if other targets for the same host succeed. When `false` (default), failure scripts only run when all targets for a given host fail in a run
 
 ## CLI Usage
 ```bash
@@ -82,7 +84,13 @@ sudo systemctl start subnet-sentinel
 
 ### Failure Scripts
 
-When `runFailureScripts: true`, `subnet-sentinel` will execute all `.sh` scripts in the configured `failureScriptsDir` (default `./sh`) whenever a probe fails. Scripts are discovered at startup and executed sequentially for each failure.
+When `runFailureScripts: true`, `subnet-sentinel` will execute all `.sh` scripts in the configured `failureScriptsDir` (default `./sh`) when probe failures occur. Scripts are discovered at startup and executed sequentially.
+
+Failures are grouped per `(subnet CIDR, host IP)`. When `alertOnPartialTargetFailure` is `false` (default):
+- If any target succeeds for a given host, no failure scripts run for that host
+- If all targets fail for a given host, scripts run for each failed probe for that host
+
+When `alertOnPartialTargetFailure` is `true`, scripts run for every failed probe regardless of other successes.
 
 Each script receives the following environment variables:
 - `SUBNET_CIDR`: the subnet CIDR that failed

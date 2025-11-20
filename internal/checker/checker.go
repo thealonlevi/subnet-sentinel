@@ -60,7 +60,13 @@ func New(cfg config.Config, subs []subnets.Subnet, client HTTPClient, logger log
 }
 
 func (c *Checker) Run(ctx context.Context) ([]Result, error) {
+	type hostKey struct {
+		Subnet string
+		IP     string
+	}
 	results := make([]Result, 0)
+	hostHasSuccess := make(map[hostKey]bool)
+	hostFailures := make(map[hostKey][]FailureEvent)
 	mountAttempted := false
 	for _, subnet := range c.Subnets {
 		select {
@@ -102,27 +108,45 @@ func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 					err = retryErr
 				}
 				results = append(results, res)
+				key := hostKey{Subnet: subnet.CIDR, IP: host.String()}
 				if err != nil {
 					if retried {
 						c.Logger.Error("request failed after retry subnet=%s ip=%s url=%s initial_error=%s error=%s", subnet.CIDR, host.String(), target, errorString(initialErr), err.Error())
 					} else {
 						c.Logger.Error("request failed subnet=%s ip=%s url=%s error=%s", subnet.CIDR, host.String(), target, err.Error())
 					}
-					if c.OnFailure != nil {
-						c.OnFailure(ctx, FailureEvent{
-							SubnetCIDR: subnet.CIDR,
-							IP:         host,
-							Target:     target,
-							Error:      err,
-							Timestamp:  time.Now(),
-						})
-					}
+					hostFailures[key] = append(hostFailures[key], FailureEvent{
+						SubnetCIDR: subnet.CIDR,
+						IP:         host,
+						Target:     target,
+						Error:      err,
+						Timestamp:  time.Now(),
+					})
 				} else {
+					hostHasSuccess[key] = true
 					if retried || initialErr != nil {
 						c.Logger.Info("request succeeded after retry subnet=%s ip=%s url=%s status=%d initial_error=%s", subnet.CIDR, host.String(), target, res.StatusCode, errorString(initialErr))
 					} else {
 						c.Logger.Debug("request succeeded subnet=%s ip=%s url=%s status=%d", subnet.CIDR, host.String(), target, res.StatusCode)
 					}
+				}
+			}
+		}
+	}
+	if c.OnFailure != nil {
+		if c.Config.AlertOnPartialTargetFailure {
+			for _, events := range hostFailures {
+				for _, e := range events {
+					c.OnFailure(ctx, e)
+				}
+			}
+		} else {
+			for key, events := range hostFailures {
+				if hostHasSuccess[key] {
+					continue
+				}
+				for _, e := range events {
+					c.OnFailure(ctx, e)
 				}
 			}
 		}

@@ -16,14 +16,15 @@ type SubnetConfig struct {
 }
 
 type Config struct {
-	Subnets           []SubnetConfig `yaml:"subnets"`
-	Targets           []string       `yaml:"targets"`
-	IPsPerSubnet      int            `yaml:"ipsPerSubnet"`
-	IntervalSeconds   int            `yaml:"intervalSeconds"`
-	AutoMountSubnets  bool           `yaml:"autoMountSubnets"`
-	DefaultInterface  string         `yaml:"defaultInterface"`
-	RunFailureScripts bool           `yaml:"runFailureScripts"`
-	FailureScriptsDir string         `yaml:"failureScriptsDir"`
+	Subnets                     []SubnetConfig `yaml:"subnets"`
+	Targets                     []string       `yaml:"targets"`
+	IPsPerSubnet                int            `yaml:"ipsPerSubnet"`
+	IntervalSeconds             int            `yaml:"intervalSeconds"`
+	AutoMountSubnets            bool           `yaml:"autoMountSubnets"`
+	DefaultInterface            string         `yaml:"defaultInterface"`
+	RunFailureScripts           bool           `yaml:"runFailureScripts"`
+	FailureScriptsDir           string         `yaml:"failureScriptsDir"`
+	AlertOnPartialTargetFailure bool           `yaml:"alertOnPartialTargetFailure"`
 }
 
 var defaultTargets = []string{

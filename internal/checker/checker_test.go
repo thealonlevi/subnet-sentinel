@@ -170,3 +170,167 @@ func TestCheckerRetriesAfterMount(t *testing.T) {
 		t.Fatalf("expected same host ip across retries")
 	}
 }
+
+func TestCheckerAlertsOnlyWhenAllTargetsFail(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "192.168.50.0/30"},
+		},
+		Targets:                     []string{"https://ok.test", "https://fail.test"},
+		IPsPerSubnet:                1,
+		AlertOnPartialTargetFailure: false,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{
+			{result: httpclient.Result{StatusCode: 200, Duration: 50 * time.Millisecond}},
+			{result: httpclient.Result{StatusCode: 503, Duration: 80 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
+		},
+	}
+	logger, err := logging.New("error")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	failureCount := 0
+	onFailure := func(ctx context.Context, e FailureEvent) {
+		failureCount++
+	}
+	chk, err := New(cfg, subs, mock, logger, nil, onFailure)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	successCount := 0
+	failCount := 0
+	for _, res := range results {
+		if res.Success {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+	if successCount != 1 {
+		t.Fatalf("expected 1 success, got %d", successCount)
+	}
+	if failCount != 1 {
+		t.Fatalf("expected 1 failure, got %d", failCount)
+	}
+	if failureCount != 0 {
+		t.Fatalf("expected 0 failure callbacks (host had success), got %d", failureCount)
+	}
+}
+
+func TestCheckerAlertsWhenAllTargetsFail(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "192.168.50.0/30"},
+		},
+		Targets:                     []string{"https://fail1.test", "https://fail2.test"},
+		IPsPerSubnet:                1,
+		AlertOnPartialTargetFailure: false,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{
+			{result: httpclient.Result{StatusCode: 503, Duration: 20 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
+			{result: httpclient.Result{StatusCode: 500, Duration: 30 * time.Millisecond}, err: fmt.Errorf("internal server error")},
+		},
+	}
+	logger, err := logging.New("error")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	failureCount := 0
+	onFailure := func(ctx context.Context, e FailureEvent) {
+		failureCount++
+	}
+	chk, err := New(cfg, subs, mock, logger, nil, onFailure)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	for _, res := range results {
+		if res.Success {
+			t.Fatalf("expected all failures, got success result")
+		}
+	}
+	if failureCount != 2 {
+		t.Fatalf("expected 2 failure callbacks (all targets failed), got %d", failureCount)
+	}
+}
+
+func TestCheckerAlertOnPartialTargetFailureTruePreservesOldBehavior(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "192.168.50.0/30"},
+		},
+		Targets:                     []string{"https://ok.test", "https://fail.test"},
+		IPsPerSubnet:                1,
+		AlertOnPartialTargetFailure: true,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{
+			{result: httpclient.Result{StatusCode: 200, Duration: 50 * time.Millisecond}},
+			{result: httpclient.Result{StatusCode: 503, Duration: 80 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
+		},
+	}
+	logger, err := logging.New("error")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	failureCount := 0
+	onFailure := func(ctx context.Context, e FailureEvent) {
+		failureCount++
+	}
+	chk, err := New(cfg, subs, mock, logger, nil, onFailure)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	successCount := 0
+	failCount := 0
+	for _, res := range results {
+		if res.Success {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+	if successCount != 1 {
+		t.Fatalf("expected 1 success, got %d", successCount)
+	}
+	if failCount != 1 {
+		t.Fatalf("expected 1 failure, got %d", failCount)
+	}
+	if failureCount != 1 {
+		t.Fatalf("expected 1 failure callback (old behavior with flag=true), got %d", failureCount)
+	}
+}

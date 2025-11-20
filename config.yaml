@@ -20,3 +20,4 @@ autoMountSubnets: true
 defaultInterface: eno1
 runFailureScripts: true
 failureScriptsDir: "/etc/subnet-sentinel/sh"
+alertOnPartialTargetFailure: false
