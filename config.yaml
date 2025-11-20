@@ -22,4 +22,4 @@ runFailureScripts: true
 failureScriptsDir: "/etc/subnet-sentinel/sh"
 alertOnPartialTargetFailure: false
 logFormat: "text"
-metricsAddr: ""
+metricsAddr: ":9090"
