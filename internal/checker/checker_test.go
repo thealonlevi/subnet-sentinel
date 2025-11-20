@@ -56,7 +56,7 @@ func TestCheckerRunCollectsResults(t *testing.T) {
 			{result: httpclient.Result{StatusCode: 503, Duration: 80 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
 		},
 	}
-	logger, err := logging.New("error")
+	logger, err := logging.New("error", "text")
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestCheckerRetriesAfterMount(t *testing.T) {
 			{result: httpclient.Result{StatusCode: 200, Duration: 40 * time.Millisecond}},
 		},
 	}
-	logger, err := logging.New("error")
+	logger, err := logging.New("error", "text")
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestCheckerAlertsOnlyWhenAllTargetsFail(t *testing.T) {
 			{result: httpclient.Result{StatusCode: 503, Duration: 80 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
 		},
 	}
-	logger, err := logging.New("error")
+	logger, err := logging.New("error", "text")
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestCheckerAlertsWhenAllTargetsFail(t *testing.T) {
 			{result: httpclient.Result{StatusCode: 500, Duration: 30 * time.Millisecond}, err: fmt.Errorf("internal server error")},
 		},
 	}
-	logger, err := logging.New("error")
+	logger, err := logging.New("error", "text")
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}
@@ -296,7 +296,7 @@ func TestCheckerAlertOnPartialTargetFailureTruePreservesOldBehavior(t *testing.T
 			{result: httpclient.Result{StatusCode: 503, Duration: 80 * time.Millisecond}, err: fmt.Errorf("service unavailable")},
 		},
 	}
-	logger, err := logging.New("error")
+	logger, err := logging.New("error", "text")
 	if err != nil {
 		t.Fatalf("logger init: %v", err)
 	}

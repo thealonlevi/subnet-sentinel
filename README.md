@@ -45,6 +45,8 @@ defaultInterface: eno1
 runFailureScripts: false
 failureScriptsDir: "./sh"
 alertOnPartialTargetFailure: false
+logFormat: "text"
+metricsAddr: ":9090"
 ```
 
 Key fields:
@@ -57,6 +59,8 @@ Key fields:
 - `runFailureScripts`: when true, executes all `.sh` scripts in `failureScriptsDir` on each probe failure (default false)
 - `failureScriptsDir`: directory containing failure scripts (default `./sh`)
 - `alertOnPartialTargetFailure`: when `true`, failure scripts run on every failed probe, even if other targets for the same host succeed. When `false` (default), failure scripts only run when all targets for a given host fail in a run
+- `logFormat`: "text" or "json" (default "text"). When "json", logs are emitted as one JSON object per line
+- `metricsAddr`: address for optional Prometheus /metrics HTTP server. Empty disables metrics
 
 ## CLI Usage
 ```bash
@@ -69,6 +73,8 @@ subnet-sentinel mount         # enforce mount prerequisites
 ### Flags
 - `--config`, `-c`: alternate config path
 - `--log-level`: `debug`, `info`, or `error` (default `info`)
+- `--log-format`: `text` or `json` (default from config, or "text")
+- `--metrics-addr`: address for metrics HTTP server (default from config, or empty to disable)
 
 ## Systemd Service
 Install the binary under `/usr/local/bin/subnet-sentinel` and place `packaging/systemd/subnet-sentinel.service` in `/etc/systemd/system/`. Then run:
@@ -109,6 +115,10 @@ Make scripts executable:
 ```bash
 chmod +x sh/alert.sh
 ```
+
+### Metrics
+
+When `metricsAddr` is set, `subnet-sentinel` exposes `/metrics` on that address in Prometheus text format. Metrics include run counts, success/failure totals, per-subnet and per-target counters, per-host failure counts, and mount attempt counts.
 
 ### Container vs bare-metal
 

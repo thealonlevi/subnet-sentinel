@@ -25,6 +25,8 @@ type Config struct {
 	RunFailureScripts           bool           `yaml:"runFailureScripts"`
 	FailureScriptsDir           string         `yaml:"failureScriptsDir"`
 	AlertOnPartialTargetFailure bool           `yaml:"alertOnPartialTargetFailure"`
+	MetricsAddr                 string         `yaml:"metricsAddr"`
+	LogFormat                   string         `yaml:"logFormat"`
 }
 
 var defaultTargets = []string{
@@ -61,6 +63,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.FailureScriptsDir == "" {
 		c.FailureScriptsDir = "./sh"
+	}
+	if c.LogFormat == "" {
+		c.LogFormat = "text"
 	}
 }
 
