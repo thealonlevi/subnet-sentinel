@@ -8,8 +8,14 @@ make build
 
 sudo systemctl stop subnet-sentinel 2>/dev/null || true
 
+sudo mkdir -p /etc/subnet-sentinel /etc/subnet-sentinel/sh
+
 if [ -f "$REPO_DIR/config.yaml" ]; then
   sudo cp "$REPO_DIR/config.yaml" /etc/subnet-sentinel/config.yaml
+fi
+
+if [ -f "$REPO_DIR/.env" ]; then
+  sudo cp "$REPO_DIR/.env" /etc/subnet-sentinel/.env
 fi
 
 if ls "$REPO_DIR/sh"/*.sh >/dev/null 2>&1; then
