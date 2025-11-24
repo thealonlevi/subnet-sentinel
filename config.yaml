@@ -29,5 +29,5 @@ defaultInterface: eno1
 runFailureScripts: true
 failureScriptsDir: "/etc/subnet-sentinel/sh"
 alertOnPartialTargetFailure: false
-logFormat: "text"
+logFormat: "json"
 metricsAddr: ":9090"
