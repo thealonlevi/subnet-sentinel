@@ -90,11 +90,14 @@ func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 				continue
 			}
 			targets = c.Config.TargetsIPv6
+			c.Logger.Debug("processing IPv6 subnet=%s with %d targets", subnet.CIDR, len(targets))
 		}
 		hosts, err := subnets.RandomHosts(subnet.Network, subnet.ExcludeHosts, c.Config.IPsPerSubnet)
 		if err != nil {
+			c.Logger.Error("failed to select hosts for subnet=%s: %v", subnet.CIDR, err)
 			return results, fmt.Errorf("select hosts for %s: %w", subnet.CIDR, err)
 		}
+		c.Logger.Debug("selected %d hosts for subnet=%s", len(hosts), subnet.CIDR)
 		for _, host := range hosts {
 			for _, target := range targets {
 				select {

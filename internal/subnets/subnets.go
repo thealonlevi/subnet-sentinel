@@ -55,7 +55,10 @@ func FromConfigs(configs []config.SubnetConfig) ([]Subnet, error) {
 			if maskSize >= 128 {
 				return nil, fmt.Errorf("subnet %s prefix too small (must be /0-/127)", cfg.CIDR)
 			}
-			// Keep full 16-byte IPv6 address
+			// Ensure ipNet.IP is a proper 16-byte IPv6 address
+			if len(ipNet.IP) != net.IPv6len {
+				ipNet.IP = ip.To16()
+			}
 		}
 		excludes := make([]net.IP, 0, len(cfg.ExcludeHosts))
 		for _, host := range cfg.ExcludeHosts {
