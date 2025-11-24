@@ -8,10 +8,18 @@ subnets:
     mountInterface: eno1
   - cidr: 154.208.112.0/21
     mountInterface: eno1
+  - cidr: 2a0f:b243::/32
+    mountInterface: lo
+    ipVersion: 6
 
 targets:
   - https://google.com
   - https://ipinfo.io
+  - https://icanhazip.com
+
+targetsIPv6:
+  - https://v6.ipinfo.io
+  - https://google.com
   - https://icanhazip.com
 
 ipsPerSubnet: 5

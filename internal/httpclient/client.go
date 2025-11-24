@@ -27,13 +27,13 @@ func (c *Client) Do(ctx context.Context, source net.IP, url string) (Result, err
 	if timeout <= 0 {
 		timeout = 15 * time.Second
 	}
-	ip4 := source.To4()
-	if ip4 == nil {
-		return Result{}, fmt.Errorf("source ip must be ipv4")
+	ip := append(net.IP(nil), source...)
+	if ip == nil {
+		return Result{}, fmt.Errorf("invalid source ip")
 	}
 	dialer := &net.Dialer{
 		Timeout:   timeout,
-		LocalAddr: &net.TCPAddr{IP: ip4, Port: 0},
+		LocalAddr: &net.TCPAddr{IP: ip, Port: 0},
 	}
 	transport := &http.Transport{
 		DialContext:           dialer.DialContext,

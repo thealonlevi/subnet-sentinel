@@ -31,7 +31,7 @@ func New(level, format string) (Logger, error) {
 	isJSON := strings.ToLower(strings.TrimSpace(format)) == "json"
 	return Logger{
 		level:      lvl,
-		base:       log.New(os.Stdout, "", log.LstdFlags),
+		base:       log.New(os.Stdout, "", 0),
 		jsonFormat: isJSON,
 	}, nil
 }
@@ -50,12 +50,39 @@ func ParseLevel(level string) (Level, error) {
 }
 
 func (l Logger) log(level string, message string, args ...interface{}) {
+	msg := message
+	kv := make(map[string]interface{})
+	var textSuffix strings.Builder
+
+	for i := 0; i < len(args); i += 2 {
+		if i+1 >= len(args) {
+			break
+		}
+		key := args[i]
+		val := args[i+1]
+		var keyStr string
+		if k, ok := key.(string); ok {
+			keyStr = k
+		} else {
+			keyStr = fmt.Sprintf("arg%d", i/2+1)
+		}
+		kv[keyStr] = val
+		if textSuffix.Len() > 0 {
+			textSuffix.WriteString(" ")
+		}
+		textSuffix.WriteString(keyStr)
+		textSuffix.WriteString("=")
+		textSuffix.WriteString(fmt.Sprintf("%v", val))
+	}
+
 	if l.jsonFormat {
-		msg := fmt.Sprintf(message, args...)
 		entry := map[string]interface{}{
-			"ts":      time.Now().Format(time.RFC3339),
-			"level":   level,
-			"message": msg,
+			"ts":    time.Now().Format(time.RFC3339),
+			"level": level,
+			"msg":   msg,
+		}
+		for k, v := range kv {
+			entry[k] = v
 		}
 		data, err := json.Marshal(entry)
 		if err != nil {
@@ -64,7 +91,11 @@ func (l Logger) log(level string, message string, args ...interface{}) {
 		}
 		l.base.Println(string(data))
 	} else {
-		l.base.Printf(level+" "+message, args...)
+		final := msg
+		if textSuffix.Len() > 0 {
+			final += " " + textSuffix.String()
+		}
+		l.base.Printf("%s %s", level, final)
 	}
 }
 

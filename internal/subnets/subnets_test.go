@@ -75,3 +75,119 @@ func TestRandomHostsRespectsExclusions(t *testing.T) {
 		}
 	}
 }
+
+func TestFromConfigsParsesIPv6Subnets(t *testing.T) {
+	subnetConfigs := []config.SubnetConfig{
+		{
+			CIDR:           "2a0f:b243::/32",
+			ExcludeHosts:   []string{"2a0f:b243::1"},
+			MountInterface: "lo",
+			IPVersion:      6,
+		},
+	}
+	result, err := FromConfigs(subnetConfigs)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 subnet, got %d", len(result))
+	}
+	if result[0].IPVersion != 6 {
+		t.Fatalf("expected IPVersion=6, got %d", result[0].IPVersion)
+	}
+	if result[0].Network.IP.To4() != nil {
+		t.Fatalf("expected IPv6 address, got IPv4")
+	}
+	if !result[0].Network.Contains(net.ParseIP("2a0f:b243::5")) {
+		t.Fatalf("expected parsed subnet to contain host")
+	}
+	if len(result[0].ExcludeHosts) != 1 {
+		t.Fatalf("expected 1 exclude host, got %d", len(result[0].ExcludeHosts))
+	}
+}
+
+func TestFromConfigsAutoDetectsIPv6(t *testing.T) {
+	subnetConfigs := []config.SubnetConfig{
+		{
+			CIDR:           "2a0f:b243::/32",
+			MountInterface: "lo",
+			IPVersion:      0, // auto-detect
+		},
+	}
+	result, err := FromConfigs(subnetConfigs)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result[0].IPVersion != 6 {
+		t.Fatalf("expected auto-detected IPVersion=6, got %d", result[0].IPVersion)
+	}
+}
+
+func TestRandomHostsIPv6(t *testing.T) {
+	_, ipNet, err := net.ParseCIDR("2a0f:b243::/64")
+	if err != nil {
+		t.Fatalf("parse cidr: %v", err)
+	}
+	excludes := []net.IP{
+		net.ParseIP("2a0f:b243::1"),
+	}
+	hosts, err := RandomHosts(ipNet, excludes, 3)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(hosts) != 3 {
+		t.Fatalf("expected 3 hosts, got %d", len(hosts))
+	}
+	seen := make(map[string]struct{})
+	for _, host := range hosts {
+		if host == nil {
+			t.Fatalf("host nil")
+		}
+		if host.To4() != nil {
+			t.Fatalf("expected IPv6 address, got IPv4")
+		}
+		if host.Equal(net.ParseIP("2a0f:b243::")) {
+			t.Fatalf("network address selected")
+		}
+		if host.Equal(net.ParseIP("2a0f:b243::1")) {
+			t.Fatalf("excluded host selected")
+		}
+		key := host.String()
+		if _, ok := seen[key]; ok {
+			t.Fatalf("duplicate host selected")
+		}
+		seen[key] = struct{}{}
+		if !ipNet.Contains(host) {
+			t.Fatalf("host outside subnet")
+		}
+	}
+}
+
+func TestDeterministicHostIPv6(t *testing.T) {
+	_, ipNet, err := net.ParseCIDR("2a0f:b243::/64")
+	if err != nil {
+		t.Fatalf("parse cidr: %v", err)
+	}
+	excludes := []net.IP{
+		net.ParseIP("2a0f:b243::1"),
+	}
+	host, err := DeterministicHost(ipNet, excludes)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if host == nil {
+		t.Fatalf("expected host, got nil")
+	}
+	if host.To4() != nil {
+		t.Fatalf("expected IPv6 address, got IPv4")
+	}
+	if host.Equal(net.ParseIP("2a0f:b243::")) {
+		t.Fatalf("network address selected")
+	}
+	if host.Equal(net.ParseIP("2a0f:b243::1")) {
+		t.Fatalf("excluded host selected")
+	}
+	if !ipNet.Contains(host) {
+		t.Fatalf("host outside subnet")
+	}
+}

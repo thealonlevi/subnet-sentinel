@@ -334,3 +334,106 @@ func TestCheckerAlertOnPartialTargetFailureTruePreservesOldBehavior(t *testing.T
 		t.Fatalf("expected 1 failure callback (old behavior with flag=true), got %d", failureCount)
 	}
 }
+
+func TestCheckerDualStack(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "192.168.50.0/30", IPVersion: 4},
+			{CIDR: "2a0f:b243::/64", IPVersion: 6},
+		},
+		TargetsIPv4:  []string{"https://ipv4.test"},
+		TargetsIPv6:  []string{"https://ipv6.test"},
+		IPsPerSubnet: 1,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	if len(subs) != 2 {
+		t.Fatalf("expected 2 subnets, got %d", len(subs))
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{
+			{result: httpclient.Result{StatusCode: 200, Duration: 50 * time.Millisecond}}, // IPv4
+			{result: httpclient.Result{StatusCode: 200, Duration: 50 * time.Millisecond}}, // IPv6
+		},
+	}
+	logger, err := logging.New("error", "text")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	chk, err := New(cfg, subs, mock, logger, nil, nil)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	// Verify IPv4 subnet used IPv4 target
+	ipv4Result := results[0]
+	if ipv4Result.Subnet != cfg.Subnets[0].CIDR {
+		t.Fatalf("expected first result for IPv4 subnet")
+	}
+	if ipv4Result.URL != cfg.TargetsIPv4[0] {
+		t.Fatalf("expected IPv4 result to use IPv4 target, got %s", ipv4Result.URL)
+	}
+	// Verify IPv6 subnet used IPv6 target
+	ipv6Result := results[1]
+	if ipv6Result.Subnet != cfg.Subnets[1].CIDR {
+		t.Fatalf("expected second result for IPv6 subnet")
+	}
+	if ipv6Result.URL != cfg.TargetsIPv6[0] {
+		t.Fatalf("expected IPv6 result to use IPv6 target, got %s", ipv6Result.URL)
+	}
+	// Verify calls were made with correct IP families
+	if len(mock.calls) != 2 {
+		t.Fatalf("expected 2 client calls, got %d", len(mock.calls))
+	}
+	if mock.calls[0].IP.To4() == nil {
+		t.Fatalf("expected first call with IPv4 address")
+	}
+	if mock.calls[1].IP.To4() != nil {
+		t.Fatalf("expected second call with IPv6 address")
+	}
+}
+
+func TestCheckerIPv6NoTargetsSkipped(t *testing.T) {
+	cfg := config.Config{
+		Subnets: []config.SubnetConfig{
+			{CIDR: "2a0f:b243::/64", IPVersion: 6},
+		},
+		TargetsIPv4: []string{"https://ipv4.test"},
+		// No TargetsIPv6
+		IPsPerSubnet: 1,
+	}
+	subs, err := subnets.FromConfigs(cfg.Subnets)
+	if err != nil {
+		t.Fatalf("subnet parse: %v", err)
+	}
+	mock := &mockHTTPClient{
+		responses: []mockResponse{},
+	}
+	logger, err := logging.New("error", "text")
+	if err != nil {
+		t.Fatalf("logger init: %v", err)
+	}
+	chk, err := New(cfg, subs, mock, logger, nil, nil)
+	if err != nil {
+		t.Fatalf("checker init: %v", err)
+	}
+	results, err := chk.Run(context.Background())
+	if err != nil {
+		t.Fatalf("checker run: %v", err)
+	}
+	// IPv6 subnet should be skipped (no targets), so no results
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results (IPv6 subnet skipped), got %d", len(results))
+	}
+	if len(mock.calls) != 0 {
+		t.Fatalf("expected 0 client calls (subnet skipped), got %d", len(mock.calls))
+	}
+}

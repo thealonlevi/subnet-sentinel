@@ -128,9 +128,9 @@ func run() error {
 	case "once":
 		return executeOnce(ctx, cfg, subnetDefs, logger, mountFn, onFailure, reg)
 	case "check-mount":
-		return executeCheckMount(ctx, requests)
+		return executeCheckMount(ctx, logger, requests)
 	case "mount":
-		return executeMount(ctx, requests, reg)
+		return executeMount(ctx, logger, requests, reg)
 	case "":
 		return executeRunLoop(ctx, cfg, subnetDefs, logger, mountFn, onFailure, reg)
 	default:
@@ -195,7 +195,7 @@ func executeOnce(ctx context.Context, cfg config.Config, subs []subnets.Subnet, 
 	return nil
 }
 
-func executeCheckMount(ctx context.Context, requests []mount.Request) error {
+func executeCheckMount(ctx context.Context, logger logging.Logger, requests []mount.Request) error {
 	statuses, err := mount.Check(ctx, requests)
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func executeCheckMount(ctx context.Context, requests []mount.Request) error {
 	return nil
 }
 
-func executeMount(ctx context.Context, requests []mount.Request, reg *metrics.Registry) error {
+func executeMount(ctx context.Context, logger logging.Logger, requests []mount.Request, reg *metrics.Registry) error {
 	if reg != nil {
 		reg.IncMountAttempt()
 	}

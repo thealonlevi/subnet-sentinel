@@ -74,12 +74,29 @@ func (c *Checker) Run(ctx context.Context) ([]Result, error) {
 			return results, ctx.Err()
 		default:
 		}
+		// Select target list based on subnet IP family
+		var targets []string
+		if subnet.Network.IP.To4() != nil {
+			// IPv4 subnet
+			if len(c.Config.TargetsIPv4) > 0 {
+				targets = c.Config.TargetsIPv4
+			} else {
+				targets = c.Config.Targets
+			}
+		} else {
+			// IPv6 subnet
+			if len(c.Config.TargetsIPv6) == 0 {
+				c.Logger.Warn("no IPv6 targets configured for subnet=%s, skipping", subnet.CIDR)
+				continue
+			}
+			targets = c.Config.TargetsIPv6
+		}
 		hosts, err := subnets.RandomHosts(subnet.Network, subnet.ExcludeHosts, c.Config.IPsPerSubnet)
 		if err != nil {
 			return results, fmt.Errorf("select hosts for %s: %w", subnet.CIDR, err)
 		}
 		for _, host := range hosts {
-			for _, target := range c.Config.Targets {
+			for _, target := range targets {
 				select {
 				case <-ctx.Done():
 					return results, ctx.Err()
